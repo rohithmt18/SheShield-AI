@@ -8,6 +8,17 @@
 
 const KEY = 'sheshield.session';
 
+/**
+ * Where the API lives.
+ *
+ * Empty by default, so calls stay relative ("/api/…") and same-origin — which
+ * is what the Vite dev proxy and a Vercel rewrite both rely on, and it avoids
+ * CORS entirely. Set VITE_API_URL when the frontend is hosted apart from the
+ * backend with no proxy in front; the backend's CORS_ORIGIN must then list the
+ * frontend's URL.
+ */
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
 export const getSessionId = () => {
   try { return sessionStorage.getItem(KEY); } catch { return null; }
 };
@@ -31,7 +42,7 @@ class ApiError extends Error {
 async function request(path, { method = 'GET', body, signal } = {}) {
   let response;
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${API_BASE}/api${path}`, {
       method,
       signal,
       headers: body ? { 'content-type': 'application/json' } : undefined,
@@ -39,7 +50,12 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
-    throw new ApiError('Cannot reach the server. Is the backend running on port 5050?', 0);
+    throw new ApiError(
+      API_BASE
+        ? `Cannot reach the server at ${API_BASE}.`
+        : 'Cannot reach the server. Is the backend running on port 5050?',
+      0,
+    );
   }
 
   const text = await response.text();
@@ -96,7 +112,7 @@ export const api = {
 
   getReport: (id = getSessionId()) => (id ? request(`/report/${id}`) : Promise.resolve(null)),
 
-  reportPdfUrl: (id = getSessionId()) => `/api/report/${id}/pdf`,
+  reportPdfUrl: (id = getSessionId()) => `${API_BASE}/api/report/${id}/pdf`,
 
   resources: ({ categories = [], level = 'medium', region = '' } = {}) => request(
     `/resources?categories=${encodeURIComponent(categories.join(','))}`
