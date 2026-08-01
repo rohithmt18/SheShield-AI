@@ -36,7 +36,7 @@ her while she decides what to do, and turns the evidence into a report she can a
 
 **Frontend** React 19 · Vite · Tailwind CSS v4 · shadcn/ui · Aceternity-style hero & animations ·
 Magic UI-style dashboard motion · Framer Motion
-**Backend** Node 20+ · Express 5 · Google Gemini (`@google/genai`) · PDFKit
+**Backend** Node 20+ · Express 5 · Groq or Google Gemini (swappable) · PDFKit
 **Database** MongoDB Atlas, with JSON-file and in-memory adapters behind one interface
 
 ---
@@ -57,7 +57,8 @@ sheshieldai/
 │   │   ├── config.js
 │   │   ├── index.js           # Express app, CORS, error handling, shutdown
 │   │   ├── middleware/        # hashed-IP rate limiting
-│   │   ├── providers/         # gemini.js · heuristic.js (offline) · errors.js
+│   │   ├── providers/         # index.js (selection) · groq.js · gemini.js
+│   │   │                      # prompts.js (shared) · heuristic.js (offline)
 │   │   ├── routes/            # session · analyze · chat · report
 │   │   └── services/          # parse · analyze · chat · report · pdf · resources
 │   └── test/smoke.mjs         # 17 tests, no key or network needed
@@ -97,7 +98,10 @@ in-memory storage — the whole app still works.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `GEMINI_API_KEY` | — | Free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Blank → offline engine. |
+| `AI_PROVIDER` | auto | `groq` or `gemini`. Unset → whichever key is present, Groq first. |
+| `GROQ_API_KEY` | — | Free key at [console.groq.com/keys](https://console.groq.com/keys). |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Any Groq chat model. |
+| `GEMINI_API_KEY` | — | Free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | `gemini-2.5-flash` is retired for new keys. `gemini-flash-latest` always tracks the newest. |
 | `MONGODB_URI` | — | Atlas free M0. Falls back to `DATA_FILE` if unreachable. |
 | `DATA_FILE` | `./.data/sessions.json` | Set empty to force in-memory. |

@@ -15,6 +15,24 @@ export const config = {
     model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
   },
 
+  groq: {
+    apiKey: trim(process.env.GROQ_API_KEY),
+    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  },
+
+  /**
+   * Which backend answers. AI_PROVIDER forces a choice; otherwise whichever
+   * key is present wins, Groq first. Empty means the offline engine — which is
+   * a supported mode, not a failure.
+   */
+  get aiProvider() {
+    const forced = trim(process.env.AI_PROVIDER).toLowerCase();
+    if (forced) return forced;
+    if (this.groq.apiKey) return 'groq';
+    if (this.gemini.apiKey) return 'gemini';
+    return '';
+  },
+
   storage: {
     mongoUri: process.env.MONGODB_URI || '',
     dbName: process.env.MONGODB_DB || 'sheshieldai',

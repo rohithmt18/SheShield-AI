@@ -15,6 +15,14 @@ export const LEVEL_STYLES = {
 
 export const levelStyle = (level) => LEVEL_STYLES[level] ?? LEVEL_STYLES.none;
 
+/** Display name for whichever engine produced a result. */
+const ENGINE_LABELS = { gemini: 'Gemini', groq: 'Groq', heuristic: 'Offline engine', offline: 'Offline engine' };
+
+export const engineLabel = (engine) => ENGINE_LABELS[engine] ?? 'Offline engine';
+
+/** True when a real model produced this, rather than the rule-based fallback. */
+export const isAiEngine = (engine) => engine === 'gemini' || engine === 'groq';
+
 export function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleString(undefined, {

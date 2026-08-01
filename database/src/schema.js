@@ -71,7 +71,7 @@ export function normaliseAnalysis(raw, { messages, sourceLabel, engine }) {
   return {
     id: newAnalysisId(),
     createdAt: new Date().toISOString(),
-    engine: ['gemini'].includes(engine) ? engine : 'heuristic',
+    engine: ['gemini', 'groq'].includes(engine) ? engine : 'heuristic',
     sourceLabel: str(sourceLabel, 80) || null,
     messageCount: scored.length,
     overallSeverity,

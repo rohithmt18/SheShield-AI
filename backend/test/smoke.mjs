@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 // Force the offline path so the suite never needs a key or a network.
+//
+// These are assigned before importing anything that reads config, because
+// dotenv will not overwrite a variable that is already set — including one set
+// to an empty string. Every provider key must be listed: run from the backend
+// directory, `npm test` would otherwise load backend/.env and hit a live API.
+process.env.AI_PROVIDER = '';
+process.env.GROQ_API_KEY = '';
 process.env.GEMINI_API_KEY = '';
 process.env.GOOGLE_API_KEY = '';
 process.env.MONGODB_URI = '';
@@ -203,6 +210,77 @@ test('deleting a session removes everything held for it', async () => {
 
   await api(`/api/session/${sessionId}`, { method: 'DELETE' });
   assert.equal((await api(`/api/session/${sessionId}`)).status, 404);
+});
+
+test('messages the model skipped are scored offline, never left as safe', async () => {
+  const { fillUnscoredMessages } = await import('../src/services/analyze.js');
+  const { normaliseAnalysis } = await import('@sheshieldai/database');
+
+  const messages = [
+    { sender: 'X', text: 'hey' },
+    { sender: 'X', text: 'answer me' },
+    { sender: 'X', text: 'i will kill you' },       // index 2 — the dangerous one
+    { sender: 'X', text: 'i know where you live' }, // index 3
+  ];
+
+  // A truncated model response: valid JSON, but it closed after index 1 and
+  // never reached the threat.
+  const raw = {
+    overallSeverity: 25,
+    primaryCategory: 'harassment',
+    categories: ['harassment'],
+    escalating: false,
+    summary: 'Mildly pushy.',
+    patterns: [],
+    recommendedActions: ['Keep a copy.'],
+    messages: [
+      { index: 0, flagged: false, severity: 0, categories: [], rationale: '' },
+      { index: 1, flagged: true, severity: 25, categories: ['harassment'], rationale: 'Pushy.' },
+    ],
+  };
+
+  const unscored = fillUnscoredMessages(raw, messages);
+  assert.equal(unscored, 2, 'should detect the two messages the model never scored');
+
+  const analysis = normaliseAnalysis(raw, { messages, sourceLabel: 'test', engine: 'groq' });
+  const threat = analysis.messages[2];
+  assert.equal(threat.flagged, true, 'the skipped threat must not be reported as safe');
+  assert.ok(threat.severity >= 85, `expected critical, got ${threat.severity}`);
+  assert.ok(analysis.overallSeverity >= 85, 'overall must rise to the worst unscored message');
+  assert.ok(analysis.categories.includes('threat_of_violence'));
+});
+
+test('a fully scored response is left untouched', async () => {
+  const { fillUnscoredMessages } = await import('../src/services/analyze.js');
+  const messages = [{ sender: 'X', text: 'hey' }, { sender: 'X', text: 'bye' }];
+  const raw = {
+    overallSeverity: 10,
+    messages: [
+      { index: 0, flagged: false, severity: 0, categories: [], rationale: '' },
+      { index: 1, flagged: false, severity: 0, categories: [], rationale: '' },
+    ],
+  };
+  assert.equal(fillUnscoredMessages(raw, messages), 0);
+  assert.equal(raw.messages.length, 2);
+  assert.equal(raw.overallSeverity, 10);
+});
+
+test('provider selection falls back to offline when no key is set', async () => {
+  const { aiAvailable, aiEngine, aiDescription } = await import('../src/providers/index.js');
+  assert.equal(aiAvailable(), false);
+  assert.equal(aiEngine(), 'heuristic');
+  assert.match(aiDescription(), /offline/i);
+});
+
+test('stored engine accepts groq and rejects anything unknown', async () => {
+  const { normaliseAnalysis } = await import('@sheshieldai/database');
+  const messages = [{ sender: 'X', text: 'hello' }];
+  const raw = { messages: [], overallSeverity: 0 };
+
+  assert.equal(normaliseAnalysis(raw, { messages, engine: 'groq' }).engine, 'groq');
+  assert.equal(normaliseAnalysis(raw, { messages, engine: 'gemini' }).engine, 'gemini');
+  // Anything else must not be recorded as if a model produced it.
+  assert.equal(normaliseAnalysis(raw, { messages, engine: 'wat' }).engine, 'heuristic');
 });
 
 test('/health and /api/meta report capability', async () => {

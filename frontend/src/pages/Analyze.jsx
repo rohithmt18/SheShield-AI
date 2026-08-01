@@ -17,7 +17,7 @@ import { MessageList } from '@/components/MessageList';
 import { ResourceList } from '@/components/ResourceList';
 import { api } from '@/lib/api';
 import { useApp } from '@/lib/AppContext';
-import { cn, levelStyle } from '@/lib/utils';
+import { cn, levelStyle, engineLabel, isAiEngine } from '@/lib/utils';
 
 const SAMPLE = `Ravi: why arent you replying
 Ravi: i saw you online
@@ -196,7 +196,7 @@ export default function Analyze() {
 
                   <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground sm:justify-start">
                     <Badge variant="secondary">
-                      {analysis.engine === 'gemini' ? 'Gemini analysis' : 'Offline engine'}
+                      {isAiEngine(analysis.engine) ? `${engineLabel(analysis.engine)} analysis` : 'Offline engine'}
                     </Badge>
                     <span>{analysis.messageCount} messages checked</span>
                   </div>
@@ -204,8 +204,15 @@ export default function Analyze() {
                   {analysis.degraded ? (
                     <p className="flex items-start gap-2 rounded-md bg-muted p-2.5 text-xs text-muted-foreground">
                       <WifiOff className="mt-0.5 size-3.5 shrink-0" />
-                      AI analysis was unavailable, so this used the offline pattern engine. It is more
-                      literal and can miss subtler cases — treat a low score with your own judgment.
+                      <span>
+                        {/* The reason comes from the server: the AI may have been
+                            unreachable, or may have covered only part of a long
+                            conversation. Saying which is more useful than a generic note. */}
+                        {isAiEngine(analysis.engine)
+                          ? analysis.degraded
+                          : 'AI analysis was unavailable, so this used the offline pattern engine.'}
+                        {' '}It is more literal and can miss subtler cases — treat a low score with your own judgment.
+                      </span>
                     </p>
                   ) : null}
                 </div>

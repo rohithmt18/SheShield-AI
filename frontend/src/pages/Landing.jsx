@@ -12,6 +12,7 @@ import { NumberTicker } from '@/components/magic/number-ticker';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useApp } from '@/lib/AppContext';
+import { engineLabel } from '@/lib/utils';
 
 const FEATURES = [
   {
@@ -53,7 +54,7 @@ const STEPS = [
 ];
 
 export default function Landing() {
-  const { aiEnabled } = useApp();
+  const { aiEnabled, aiEngine } = useApp();
 
   return (
     <>
@@ -66,7 +67,7 @@ export default function Landing() {
           >
             <Badge variant="outline" className="mb-6 border-primary/30 bg-primary/8 px-3 py-1.5 text-primary">
               <Sparkles className="size-3.5" />
-              {aiEnabled ? 'Gemini-powered analysis' : 'Running on the offline engine'}
+              {aiEnabled ? `${engineLabel(aiEngine)}-powered analysis` : 'Running on the offline engine'}
             </Badge>
           </motion.div>
 

@@ -14,7 +14,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { ResourceList } from '@/components/ResourceList';
 import { api } from '@/lib/api';
 import { useApp } from '@/lib/AppContext';
-import { formatDate } from '@/lib/utils';
+import { formatDate, engineLabel, isAiEngine } from '@/lib/utils';
 
 const FIELDS = [
   { key: 'platform', label: 'Platform', placeholder: 'WhatsApp, Instagram, X…' },
@@ -161,7 +161,9 @@ export default function Report() {
                   <Badge variant="outline" className="font-mono">{report.reference}</Badge>
                   <span>{formatDate(report.createdAt)}</span>
                   <Badge variant={report.level}>{report.level} · {report.severity}/100</Badge>
-                  <Badge variant="secondary">{report.engine === 'gemini' ? 'AI-drafted' : 'Rule-based draft'}</Badge>
+                  <Badge variant="secondary">
+                    {isAiEngine(report.engine) ? `AI-drafted · ${engineLabel(report.engine)}` : 'Rule-based draft'}
+                  </Badge>
                 </CardDescription>
               </div>
               <Button asChild>

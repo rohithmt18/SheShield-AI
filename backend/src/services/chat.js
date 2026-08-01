@@ -1,5 +1,5 @@
 import { analysisDigest } from '@sheshieldai/database';
-import { chatWithGemini, geminiAvailable } from '../providers/gemini.js';
+import { aiAvailable, aiEngine, chatWithAI } from '../providers/index.js';
 import { EMERGENCY, EVIDENCE_STEPS } from './resources.js';
 
 /**
@@ -92,13 +92,13 @@ export async function respond(history, message, lastAnalysis = null) {
     return { reply: CRISIS_REPLY, engine: 'safety', crisis: true, emergency: EMERGENCY };
   }
 
-  if (geminiAvailable()) {
+  if (aiAvailable()) {
     try {
       const context = lastAnalysis ? analysisDigest(lastAnalysis) : null;
-      const reply = await chatWithGemini(history, message, context);
-      return { reply, engine: 'gemini', crisis: false };
+      const reply = await chatWithAI(history, message, context);
+      return { reply, engine: aiEngine(), crisis: false };
     } catch (err) {
-      console.warn(`[chat] Gemini failed, using scripted responder — ${err.message}`);
+      console.warn(`[chat] ${aiEngine()} failed, using scripted responder — ${err.message}`);
       return { reply: offlineReply(message), engine: 'offline', crisis: false, degraded: err.message };
     }
   }
@@ -107,6 +107,6 @@ export async function respond(history, message, lastAnalysis = null) {
     reply: offlineReply(message),
     engine: 'offline',
     crisis: false,
-    degraded: 'No Gemini API key configured.',
+    degraded: 'No AI provider configured.',
   };
 }

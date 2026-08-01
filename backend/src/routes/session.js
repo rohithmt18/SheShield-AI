@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { CATEGORIES, LEVEL_META, LEVELS } from '@sheshieldai/database';
-import { geminiAvailable } from '../providers/gemini.js';
+import { aiAvailable, aiEngine } from '../providers/index.js';
 import { EMERGENCY, EVIDENCE_STEPS, REGION_OPTIONS } from '../services/resources.js';
 
 /**
@@ -36,7 +36,8 @@ export function sessionRoutes(db) {
       regions: REGION_OPTIONS,
       emergency: EMERGENCY,
       evidenceSteps: EVIDENCE_STEPS,
-      aiEnabled: geminiAvailable(),
+      aiEnabled: aiAvailable(),
+      aiEngine: aiEngine(),
     });
   });
 

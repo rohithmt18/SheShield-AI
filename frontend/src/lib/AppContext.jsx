@@ -53,6 +53,7 @@ export function AppProvider({ children }) {
     categories: meta?.categories ?? {},
     regions: meta?.regions ?? [],
     aiEnabled: meta?.aiEnabled ?? false,
+    aiEngine: meta?.aiEngine ?? 'heuristic',
     latestAnalysis: session?.analyses?.at(-1) ?? null,
   }), [meta, session, status, error, refresh]);
 

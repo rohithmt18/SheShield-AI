@@ -1,5 +1,5 @@
 import { analysisDigest, newReferenceCode, categoryLabel, LEVEL_META } from '@sheshieldai/database';
-import { generateReportWithGemini, geminiAvailable } from '../providers/gemini.js';
+import { aiAvailable, aiEngine, reportWithAI } from '../providers/index.js';
 import { resourcesFor } from './resources.js';
 
 /**
@@ -124,16 +124,16 @@ export async function buildReport(analysis, rawDetails = {}) {
   let engine = 'offline';
   let degraded = null;
 
-  if (geminiAvailable()) {
+  if (aiAvailable()) {
     try {
-      body = await generateReportWithGemini(analysisDigest(analysis), details);
-      engine = 'gemini';
+      body = await reportWithAI(analysisDigest(analysis), details);
+      engine = aiEngine();
     } catch (err) {
       degraded = err.message;
-      console.warn(`[report] Gemini failed, using offline builder — ${err.message}`);
+      console.warn(`[report] ${aiEngine()} failed, using offline builder — ${err.message}`);
     }
   } else {
-    degraded = 'No Gemini API key configured.';
+    degraded = 'No AI provider configured.';
   }
 
   body ??= offlineReport(analysis, details);

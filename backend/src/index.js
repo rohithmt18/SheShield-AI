@@ -8,7 +8,7 @@ import { sessionRoutes } from './routes/session.js';
 import { analyzeRoutes } from './routes/analyze.js';
 import { chatRoutes } from './routes/chat.js';
 import { reportRoutes } from './routes/report.js';
-import { geminiAvailable } from './providers/gemini.js';
+import { aiAvailable, aiEngine, aiDescription } from './providers/index.js';
 
 /** True for http://localhost:PORT, 127.0.0.1, or [::1] — any port. */
 function isLoopback(origin) {
@@ -45,7 +45,7 @@ export async function createServer() {
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, storage: db.backend, ai: geminiAvailable() ? 'gemini' : 'offline' });
+    res.json({ ok: true, storage: db.backend, ai: aiAvailable() ? aiEngine() : 'offline' });
   });
 
   // AI-backed routes are the expensive ones; reference data is cheap.
@@ -84,7 +84,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(`\n  SheShield AI API`);
     console.log(`  ├─ http://localhost:${config.port}`);
     console.log(`  ├─ storage : ${db.backend}`);
-    console.log(`  ├─ ai      : ${geminiAvailable() ? `gemini (${config.gemini.model})` : 'offline engine (no API key)'}`);
+    console.log(`  ├─ ai      : ${aiDescription()}`);
     console.log(`  └─ cors    : ${config.corsOrigins.join(', ')}\n`);
   });
 
