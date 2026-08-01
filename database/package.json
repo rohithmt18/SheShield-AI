@@ -1,0 +1,15 @@
+{
+  "name": "@sheshieldai/database",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SheShield AI — shared data layer with MongoDB, JSON-file, and in-memory adapters",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./taxonomy": "./src/taxonomy.js"
+  },
+  "dependencies": {
+    "mongodb": "^6.12.0"
+  }
+}

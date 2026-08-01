@@ -1,0 +1,99 @@
+import { pathToFileURL } from 'node:url';
+import express from 'express';
+import cors from 'cors';
+import { connect } from '@sheshieldai/database';
+import { config } from './config.js';
+import { rateLimit } from './middleware/rateLimit.js';
+import { sessionRoutes } from './routes/session.js';
+import { analyzeRoutes } from './routes/analyze.js';
+import { chatRoutes } from './routes/chat.js';
+import { reportRoutes } from './routes/report.js';
+import { geminiAvailable } from './providers/gemini.js';
+
+/** True for http://localhost:PORT, 127.0.0.1, or [::1] — any port. */
+function isLoopback(origin) {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return (protocol === 'http:' || protocol === 'https:')
+      && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1');
+  } catch {
+    return false;
+  }
+}
+
+export async function createServer() {
+  const db = await connect(config.storage);
+  const app = express();
+
+  app.disable('x-powered-by');
+  // Needed for correct req.ip when deployed behind a proxy (Render, Railway…).
+  app.set('trust proxy', 1);
+
+  app.use(cors({
+    origin(origin, callback) {
+      // Same-origin, curl, and server-to-server requests send no Origin.
+      if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
+      // In development any loopback port is fine: Vite silently moves to 5274+
+      // when its port is taken, and localhost/127.0.0.1 are distinct origins,
+      // so a fixed allowlist turns into mystery 403s. Production stays strict.
+      if (!config.isProduction && isLoopback(origin)) return callback(null, true);
+      callback(new Error(`Origin ${origin} is not allowed.`));
+    },
+    credentials: false,
+  }));
+
+  app.use(express.json({ limit: '1mb' }));
+
+  app.get('/health', (_req, res) => {
+    res.json({ ok: true, storage: db.backend, ai: geminiAvailable() ? 'gemini' : 'offline' });
+  });
+
+  // AI-backed routes are the expensive ones; reference data is cheap.
+  const heavy = rateLimit({ windowMs: 60_000, max: 20 });
+  const light = rateLimit({ windowMs: 60_000, max: 120 });
+
+  app.use('/api', light, sessionRoutes(db));
+  app.use('/api', heavy, analyzeRoutes(db));
+  app.use('/api', heavy, chatRoutes(db));
+  app.use('/api', heavy, reportRoutes(db));
+
+  app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown endpoint.' }));
+
+  // eslint-disable-next-line no-unused-vars -- Express identifies error handlers by arity.
+  app.use((err, _req, res, _next) => {
+    const status = /not allowed/.test(err.message) ? 403 : 500;
+    // Log the message, never the request body — it holds the user's evidence.
+    console.error(`[error] ${err.name}: ${err.message}`);
+    res.status(status).json({
+      error: status === 403
+        ? 'Origin not allowed.'
+        : 'Something went wrong on our end. Your session is safe — please try again.',
+    });
+  });
+
+  return { app, db };
+}
+
+// Only listen when executed directly, so tests can import createServer.
+// pathToFileURL keeps this correct on Windows, where drive letters would
+// otherwise produce file://c:/… instead of file:///c:/….
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { app, db } = await createServer();
+
+  const server = app.listen(config.port, () => {
+    console.log(`\n  SheShield AI API`);
+    console.log(`  ├─ http://localhost:${config.port}`);
+    console.log(`  ├─ storage : ${db.backend}`);
+    console.log(`  ├─ ai      : ${geminiAvailable() ? `gemini (${config.gemini.model})` : 'offline engine (no API key)'}`);
+    console.log(`  └─ cors    : ${config.corsOrigins.join(', ')}\n`);
+  });
+
+  const shutdown = async (signal) => {
+    console.log(`\n[${signal}] shutting down…`);
+    server.close();
+    await db.close();
+    process.exit(0);
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}

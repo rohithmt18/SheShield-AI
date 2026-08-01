@@ -1,0 +1,189 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/**
+ * Palette: deep plum ground with a rose accent. Dark is the default because
+ * this app is often opened late at night, in bed, by someone who does not want
+ * a bright screen announcing what she is reading.
+ */
+:root {
+  --background: oklch(0.99 0.005 320);
+  --foreground: oklch(0.21 0.02 300);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 300);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 300);
+  --primary: oklch(0.52 0.19 355);
+  --primary-foreground: oklch(0.99 0.005 320);
+  --secondary: oklch(0.96 0.012 320);
+  --secondary-foreground: oklch(0.28 0.03 320);
+  --muted: oklch(0.96 0.012 320);
+  --muted-foreground: oklch(0.52 0.02 300);
+  --accent: oklch(0.94 0.03 330);
+  --accent-foreground: oklch(0.28 0.05 340);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0.005 320);
+  --border: oklch(0.91 0.012 320);
+  --input: oklch(0.91 0.012 320);
+  --ring: oklch(0.52 0.19 355);
+  --radius: 0.75rem;
+
+  --level-none: oklch(0.65 0.15 160);
+  --level-low: oklch(0.68 0.13 220);
+  --level-medium: oklch(0.75 0.16 75);
+  --level-high: oklch(0.62 0.21 25);
+  --level-critical: oklch(0.52 0.24 12);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 300);
+  --foreground: oklch(0.95 0.01 320);
+  --card: oklch(0.2 0.024 302);
+  --card-foreground: oklch(0.95 0.01 320);
+  --popover: oklch(0.19 0.024 302);
+  --popover-foreground: oklch(0.95 0.01 320);
+  --primary: oklch(0.7 0.17 350);
+  --primary-foreground: oklch(0.17 0.03 320);
+  --secondary: oklch(0.26 0.03 305);
+  --secondary-foreground: oklch(0.95 0.01 320);
+  --muted: oklch(0.26 0.03 305);
+  --muted-foreground: oklch(0.7 0.02 310);
+  --accent: oklch(0.3 0.05 335);
+  --accent-foreground: oklch(0.95 0.01 320);
+  --destructive: oklch(0.65 0.21 25);
+  --destructive-foreground: oklch(0.98 0.005 320);
+  --border: oklch(0.3 0.03 305);
+  --input: oklch(0.3 0.03 305);
+  --ring: oklch(0.7 0.17 350);
+
+  --level-none: oklch(0.72 0.16 160);
+  --level-low: oklch(0.72 0.14 220);
+  --level-medium: oklch(0.8 0.16 75);
+  --level-high: oklch(0.68 0.2 25);
+  --level-critical: oklch(0.62 0.24 15);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-level-none: var(--level-none);
+  --color-level-low: var(--level-low);
+  --color-level-medium: var(--level-medium);
+  --color-level-high: var(--level-high);
+  --color-level-critical: var(--level-critical);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-aurora: aurora 22s ease-in-out infinite alternate;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes aurora {
+  0% { transform: translate3d(-6%, -3%, 0) rotate(0deg) scale(1); }
+  50% { transform: translate3d(6%, 4%, 0) rotate(8deg) scale(1.12); }
+  100% { transform: translate3d(-4%, 5%, 0) rotate(-6deg) scale(1.05); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+/* Owned locally: Tailwind only emits its own `spin` when animate-spin is used. */
+@keyframes shine-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--destructive) 55%, transparent); }
+  70% { box-shadow: 0 0 0 14px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Focus rings stay visible — this app is used under stress, often by keyboard. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+}
+
+@layer utilities {
+  .glass {
+    background-color: color-mix(in oklch, var(--card) 72%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+  .text-gradient {
+    background-image: linear-gradient(
+      100deg,
+      var(--foreground) 0%,
+      color-mix(in oklch, var(--primary) 90%, white) 45%,
+      var(--foreground) 100%
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
+/* Respect people who get motion sick — several screens here animate heavily. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
