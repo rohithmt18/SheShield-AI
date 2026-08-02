@@ -10,8 +10,9 @@
     "social"
   ],
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c magenta,cyan \"npm:dev:backend\" \"npm:dev:frontend\"",
-    "dev:all": "concurrently -n backend,frontend,social -c magenta,cyan,yellow \"npm:dev:backend\" \"npm:dev:frontend\" \"npm:dev:social\"",
+    "dev": "node scripts/check-ports.mjs 5050 5273 && concurrently --kill-others-on-fail -n backend,frontend -c magenta,cyan \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:all": "node scripts/check-ports.mjs 5050 5273 5274 && concurrently --kill-others-on-fail -n backend,frontend,social -c magenta,cyan,yellow \"npm:dev:backend\" \"npm:dev:frontend\" \"npm:dev:social\"",
+    "check:ports": "node scripts/check-ports.mjs 5050 5273 5274",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:social": "npm run dev --workspace=social",

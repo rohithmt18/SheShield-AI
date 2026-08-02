@@ -378,6 +378,21 @@ npm run dev
 `npm run dev` starts the app and the API; `npm run dev:all` adds the social client. Vite proxies
 `/api` to the backend in every case, so there is no CORS setup in dev.
 
+**These ports are fixed, not preferences.** Vite's default is to slide to the next free port when
+one is taken, which produces a page on an origin the backend has never heard of — so the app loads
+and then every API call fails, which reads like a broken backend rather than a leftover process. So
+`strictPort` is on and a preflight refuses to start anything, naming the process in the way:
+
+```text
+✖ 1 of this project's ports is already in use.
+
+  5274  Social client
+    PID 17972  node.exe
+    stop it with:  taskkill /PID 17972 /F
+```
+
+Run it on its own with `npm run check:ports`.
+
 ### Configuration
 
 Everything in `backend/.env` is optional. **With an empty file you still get a working app** — the
@@ -397,7 +412,7 @@ offline engine and in-memory storage.
 | `DATA_FILE` | `./.data/sessions.json` | Set empty to force in-memory |
 | `RETENTION_DAYS` | `7` | Enforced by a Mongo TTL index |
 | `PORT` | `5050` | Don't set this on Render — it injects its own |
-| `CORS_ORIGIN` | `http://localhost:5273` | Comma-separated. **Must be set in production** |
+| `CORS_ORIGIN` | *(dev origins)* | Comma-separated. **Adds** to `localhost`/`127.0.0.1` on 5273 + 5274 in dev; **replaces** them in production. **Must be set in production** |
 
 **Storage priority:** `MONGODB_URI` → `DATA_FILE` → in-memory.
 

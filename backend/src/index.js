@@ -110,6 +110,21 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(`  └─ cors    : ${config.corsOrigins.join(', ')}\n`);
   });
 
+  // Without this, a port clash exits on an unhandled EADDRINUSE stack trace,
+  // which buries the one fact that matters. Covers `npm start` too, where the
+  // dev preflight in scripts/check-ports.mjs never runs.
+  server.on('error', (err) => {
+    if (err.code !== 'EADDRINUSE') throw err;
+    console.error(
+      `\n[port] Port ${config.port} is already in use, so the API did not start.\n`
+      + '[port] Usually another copy of this server is still running.\n'
+      + `[port] Find it with:  ${process.platform === 'win32'
+        ? `netstat -ano -p tcp | findstr :${config.port}`
+        : `lsof -nP -iTCP:${config.port} -sTCP:LISTEN`}\n`,
+    );
+    process.exit(1);
+  });
+
   const shutdown = async (signal) => {
     console.log(`\n[${signal}] shutting down…`);
     server.close();
