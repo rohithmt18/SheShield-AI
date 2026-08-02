@@ -62,6 +62,7 @@ flowchart LR
 | 💬 **Anonymous companion** | A trauma-informed chat companion. No account, no name, no email. Crisis language (self-harm, immediate danger) is intercepted **before** the model ever sees it and answered with helplines directly. |
 | 📄 **Incident reports** | Flagged excerpts, timeline, and classifications compiled into a structured **PDF** for cybercrime.gov.in, a Cyber Crime Cell, or a platform's trust & safety team. |
 | 🧭 **Guided reporting** | Helplines, portals, and NGOs routed by incident type **and** state — the Bengaluru CEN station, not a generic list. Plus an evidence-preservation checklist. |
+| 📱 **Live screening in a feed** | A separate [social client](#the-social-client) puts the same engine inside an Instagram-style app — captions, comments, and DMs are scored **as they are written**, with warnings inline. |
 
 ### Severity model
 
@@ -83,8 +84,9 @@ Every message and every conversation lands on one of five bands:
 
 ```mermaid
 flowchart TB
-    subgraph Client["🖥️ Frontend · Vercel"]
-        UI["React 19 + Vite<br/>Tailwind v4 · shadcn/ui"]
+    subgraph Client["🖥️ Clients · Vercel"]
+        UI["SheShield app<br/>React 19 · Tailwind v4 · shadcn/ui"]
+        SOC["Social client<br/>feed · DMs · safety dashboard"]
         SS["sessionStorage<br/>(session id only)"]
     end
 
@@ -111,7 +113,9 @@ flowchart TB
         MEM["In-memory"]
     end
 
-    UI --> RW --> EX --> RL --> SVC --> PROV
+    UI --> RW
+    SOC --> RW
+    RW --> EX --> RL --> SVC --> PROV
     PROV --> GQ & GM
     PROV -.->|"fails / no key"| HEU
     SVC --> MDB
@@ -177,6 +181,89 @@ supportive reply, and a filable PDF. The UI always says which engine ran.
 
 ---
 
+## The social client
+
+Everything above works on a conversation you've *already* had. The `social/` workspace answers the
+other half: what if the screening ran **while the harm was arriving**?
+
+It's an Instagram-style app — feed, posts, comments, likes, DMs — where every caption, comment, and
+message is scored by SheShield before it settles on screen. Harmful content gets a coloured badge
+and a warning inline, high-severity content stays blurred until tapped, and one button turns any
+flagged item into the same filable incident report the main app produces.
+
+<div align="center">
+
+```mermaid
+flowchart LR
+    subgraph SC["📱 social/ — a client, nothing more"]
+        direction TB
+        P["platforms/<br/>content only"]
+        M["moderation.js<br/>queue · cache · backoff"]
+        R["riskModel.js<br/>5 levels → 4 badges"]
+        SH["shieldClient.js<br/>the only file that<br/>talks to the API"]
+        P --> M --> SH
+        M --> R
+    end
+
+    SC ==>|"HTTP only"| API["🛡️ SheShield API<br/>unchanged"]
+
+    X["X"] -.->|"one module"| P
+    YT["YouTube"] -.->|"one module"| P
+    FB["Facebook"] -.->|"one module"| P
+
+    style SC fill:#1a1625,stroke:#ff4f8b,color:#fff
+    style API fill:#064e3b,stroke:#10b981,color:#fff
+    style X fill:#2d2438,stroke:#666,color:#aaa
+    style YT fill:#2d2438,stroke:#666,color:#aaa
+    style FB fill:#2d2438,stroke:#666,color:#aaa
+```
+
+</div>
+
+**Not one line of `backend/` or `database/` changed to build it.** It uses the endpoints that were
+already there, over HTTP, like any third-party would.
+
+### Why it is split this way
+
+| Boundary | Owns | So that… |
+|---|---|---|
+| [`shieldClient.js`](social/src/lib/shieldClient.js) | The **entire** API surface | No component can quietly invent a second way to call SheShield |
+| [`platforms/`](social/src/platforms/index.js) | Content — posts, comments, threads | Adapters know nothing about screening |
+| [`riskModel.js`](social/src/lib/riskModel.js) | Level → badge collapse | The backend keeps its own five-band vocabulary |
+| [`moderation.js`](social/src/lib/moderation.js) | Queue, cache, backoff | Rate limits are handled once, not per component |
+
+Adding **X, YouTube, or Facebook** is one module satisfying the [adapter
+contract](social/src/platforms/index.js) plus one line in the registry. The AI backend, the
+moderation pipeline, and every component stay untouched — that is the whole point of the split.
+
+### Two backend constraints the client absorbs
+
+Rather than change the API, the client is built around its limits:
+
+- **20 analyses per minute.** A scrolling feed would exhaust that instantly, so content is screened
+  **once at creation**, verdicts are cached across reloads, and the queue runs serially and honours
+  `Retry-After` instead of retrying into the limiter.
+- **A session keeps only its last 20 analyses.** The dashboard treats the backend as the store of
+  record *and says so on screen*, while keeping a local index so history doesn't silently vanish at
+  the cap.
+
+### Two safety choices
+
+- 🚫 **A failed screening reads "Not screened" — never "Safe."** An absent verdict is *unknown*, not
+  clean. Collapsing those two would be the most dangerous thing this UI could do.
+- 🌫️ **High and Critical content is blurred behind one tap, not removed.** Being ambushed by abuse is
+  distressing; deleting it destroys evidence. She chooses when to look.
+
+```bash
+npm run dev:social      # http://localhost:5274
+```
+
+The seed feed deliberately contains real harm patterns — a suicide-baiting comment, a stalking
+comment, and a sextortion DM thread — so the safety layer is visible immediately instead of being an
+empty green wall.
+
+---
+
 ## Design decisions worth knowing
 
 > These are the choices that matter more than the feature list.
@@ -210,6 +297,7 @@ supportive reply, and a filable PDF. The UI always says which engine ran.
 | **AI** | Groq (`llama-3.3-70b`) or Gemini — swappable | One entry in a provider map |
 | **PDF** | PDFKit | Server-side, WinAnsi-sanitised |
 | **Database** | MongoDB Atlas + JSON-file + in-memory | One interface, three adapters |
+| **Social client** | Its own Vite app, same stack | A pure API consumer — proves the boundary holds |
 
 ---
 
@@ -239,17 +327,33 @@ sheshieldai/
 │   │   └── services/          # parse · analyze · chat · report · pdf · resources
 │   └── test/smoke.mjs         # 21 tests — no key, no network
 │
-└── frontend/                  # @sheshieldai/frontend — React app
-    ├── vercel.json            # /api proxy + SPA fallback (must live here)
-    └── src/
-        ├── lib/               # api client, session handling, AppContext
-        ├── components/
-        │   ├── ui/            # shadcn primitives
-        │   ├── aceternity/    # aurora background, spotlight, text reveal
-        │   ├── magic/         # number ticker, shine border, bento grid
-        │   └── layout/        # navbar, footer, quick exit
-        └── pages/             # Landing · Dashboard · Analyze · Companion · Report · Resources
+├── frontend/                  # @sheshieldai/frontend — React app
+│   ├── vercel.json            # /api proxy + SPA fallback (must live here)
+│   └── src/
+│       ├── lib/               # api client, session handling, AppContext
+│       ├── components/
+│       │   ├── ui/            # shadcn primitives
+│       │   ├── aceternity/    # aurora background, spotlight, text reveal
+│       │   ├── magic/         # number ticker, shine border, bento grid
+│       │   └── layout/        # navbar, footer, quick exit
+│       └── pages/             # Landing · Dashboard · Analyze · Companion · Report · Resources
+│
+└── social/                    # @sheshieldai/social — social feed client
+    └── src/                   # talks to the API over HTTP only; owns no AI logic
+        ├── lib/
+        │   ├── shieldClient.js   # the entire SheShield API surface — nothing else calls it
+        │   ├── moderation.js     # serial queue, verdict cache, 429 backoff
+        │   ├── riskModel.js      # five backend levels → four badges
+        │   └── useModeration.js  # useSyncExternalStore bindings
+        ├── platforms/
+        │   ├── index.js          # registry + adapter contract (add X/YouTube/FB here)
+        │   └── instagram.js      # content adapter, localStorage-backed
+        ├── components/           # RiskBadge · AiWarning · ScreenedText · FullReportDialog · PostCard
+        └── pages/                # Feed · Create · Messages · Safety
 ```
+
+> The dependency arrow only ever points **one way**: `social/` and `frontend/` depend on the API;
+> nothing in `backend/` or `database/` knows either of them exists.
 
 ---
 
@@ -265,12 +369,14 @@ cp backend/.env.example backend/.env    # optional — it runs without this
 npm run dev
 ```
 
-| | |
-|---|---|
-| 🖥️ Frontend | http://localhost:5273 |
-| ⚙️ API | http://localhost:5050 |
+| | | |
+|---|---|---|
+| 🖥️ **SheShield app** | http://localhost:5273 | `npm run dev` |
+| ⚙️ **API** | http://localhost:5050 | `npm run dev` |
+| 📱 **Social client** | http://localhost:5274 | `npm run dev:all` |
 
-`npm run dev` starts both. Vite proxies `/api` to the backend, so there is no CORS setup in dev.
+`npm run dev` starts the app and the API; `npm run dev:all` adds the social client. Vite proxies
+`/api` to the backend in every case, so there is no CORS setup in dev.
 
 ### Configuration
 
@@ -404,6 +510,16 @@ That file does two things:
 The Render URL in it is hardcoded — update it if the service is renamed. Alternatively drop the
 first rewrite and set `VITE_API_URL` to the backend's URL.
 
+### Social client — Vercel *(optional)*
+
+Deployed exactly like the frontend, as a **second Vercel project** on the same repo with Root
+Directory `social` and its own [`social/vercel.json`](social/vercel.json). It needs no backend
+change — but its domain must be **added to `CORS_ORIGIN`** alongside the main app's, comma-separated:
+
+```
+CORS_ORIGIN=https://she-shield-ai-frontend.vercel.app,https://your-social-app.vercel.app
+```
+
 ### ⚠️ The CORS trap
 
 `CORS_ORIGIN` **must** be set to the frontend's URL, even behind the rewrite. Vercel forwards the
@@ -433,8 +549,14 @@ in production without one.
 **Ingestion.** The original brief describes continuously monitoring connected social accounts. Meta,
 X, and Google do not expose another person's DMs to third-party apps, so that needs platform
 partnerships, not OAuth. What is built is the same detection pipeline against **paste and file
-upload** — WhatsApp exports (both formats), Instagram DMs, or anything pasted. A monitoring feed can
-be attached to the identical `/api/analyze` path if such access is ever granted.
+upload** — WhatsApp exports (both formats), Instagram DMs, or anything pasted.
+
+**The social client is a client, not a connector.** It shows exactly what continuous in-feed
+screening looks and feels like, and it is wired to the real API — but its posts and DMs come from a
+**local adapter with seeded content**, not from Instagram. `platforms/instagram.js` is a stand-in
+for an API that would return this shape *if* such access were granted. The value it proves is the
+half that is genuinely hard: the pipeline, the pacing, the UI, and the boundary. Swapping the
+adapter for a real feed changes one file.
 
 **The severity score is an automated assessment**, not a legal or professional risk determination.
 It can be wrong in both directions. The UI and every generated PDF say so.
