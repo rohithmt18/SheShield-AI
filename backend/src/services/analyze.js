@@ -74,9 +74,17 @@ export async function analyseMessages(messages, { sourceLabel, region, source = 
 
   if (engine !== 'heuristic') {
     const unscored = fillUnscoredMessages(raw, messages);
-    if (unscored) {
-      degraded = `The AI only assessed ${messages.length - unscored} of ${messages.length} messages `
-        + '— the rest were scored by the offline engine, which is more literal and can miss subtler cases.';
+    if (unscored === messages.length) {
+      // The model replied, but scored nothing — well-formed JSON with an empty
+      // or unusable messages array. Every score on screen came from the offline
+      // engine, so labelling the result "Groq analysis" would credit an
+      // assessment that never happened.
+      engine = 'heuristic';
+      degraded = 'The AI returned no usable assessment, so every message was scored by the offline engine.';
+      console.warn(`[analyze] ${aiEngine()} scored 0 of ${messages.length} messages; treating as offline.`);
+    } else if (unscored) {
+      degraded = `The AI assessed ${messages.length - unscored} of ${messages.length} messages; `
+        + 'the rest were scored by the offline engine.';
       console.warn(`[analyze] ${engine} returned ${unscored} unscored message(s); filled offline.`);
     }
   }

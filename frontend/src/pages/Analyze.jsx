@@ -34,6 +34,29 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const prettyBytes = (n) => (n < 1_000_000 ? `${Math.round(n / 1000)} KB` : `${(n / 1_000_000).toFixed(1)} MB`);
 
+/**
+ * True when a file read as text is really binary.
+ *
+ * `File.text()` never fails — it decodes anything as UTF-8 and substitutes
+ * U+FFFD for whatever it could not make sense of. A PDF or an image therefore
+ * arrives as tens of thousands of replacement characters, which then get
+ * analysed as if they were messages and come back "0 · SAFE". Control
+ * characters and replacement chars are vanishingly rare in a real chat export,
+ * so a few percent of them is decisive.
+ */
+function looksBinary(sample) {
+  if (!sample) return false;
+  let noise = 0;
+  for (let i = 0; i < sample.length; i += 1) {
+    const code = sample.charCodeAt(i);
+    // C0 control characters, excluding tab, newline and carriage return,
+    // plus U+FFFD, the decoder's "I could not read this byte" stand-in.
+    const isControl = code < 32 && code !== 9 && code !== 10 && code !== 13;
+    if (isControl || code === 0xfffd) noise += 1;
+  }
+  return noise / sample.length > 0.02;
+}
+
 export default function Analyze() {
   const { categories, regions, refresh } = useApp();
   const [mode, setMode] = useState('text');
@@ -107,14 +130,36 @@ export default function Analyze() {
 
   async function onFile(event) {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
+
+    // Choosing an image here says plainly what she wants, even though this is
+    // the export picker — so take her to the screenshot flow rather than
+    // refusing. The old behaviour read the image's bytes as text and pasted
+    // 40,000 characters of mojibake into the box, which then came back "SAFE".
+    if (IMAGE_TYPES.includes(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name)) {
+      setMode('image');
+      chooseImage(file);
+      return;
+    }
+
     if (file.size > 2_000_000) {
       setError('That file is larger than 2 MB. Paste the relevant part instead.');
       return;
     }
-    setText((await file.text()).slice(0, 40_000));
+
+    const content = (await file.text()).slice(0, 40_000);
+    if (looksBinary(content)) {
+      setError(
+        'That file is not readable as text — it looks like a PDF, document, or other binary file. '
+        + 'Upload a .txt chat export, or use the screenshot tab if it is an image.',
+      );
+      return;
+    }
+
+    setError(null);
+    setText(content);
     setSourceLabel((prev) => prev || file.name.replace(/\.(txt|csv|log)$/i, ''));
-    event.target.value = '';
   }
 
   function chooseImage(file) {
@@ -122,7 +167,10 @@ export default function Analyze() {
 
     // Checked here as well as on the server: a 9 MB upload that fails on
     // arrival wastes her data and her time, and on a phone that is not free.
-    if (!IMAGE_TYPES.includes(file.type)) {
+    // The extension is a fallback because some systems hand over a File with an
+    // empty `type`; the server still checks the actual bytes either way.
+    const named = /\.(jpe?g|png|webp)$/i.test(file.name);
+    if (!IMAGE_TYPES.includes(file.type) && !(named && !file.type)) {
       setError(`${file.type ? file.type.replace(/^image\//, '').toUpperCase() : 'That file type'} is not supported. Choose a JPG, PNG or WebP image.`);
       return;
     }
@@ -400,8 +448,8 @@ export default function Analyze() {
                             conversation. Saying which is more useful than a generic note. */}
                         {isAiEngine(analysis.engine)
                           ? analysis.degraded
-                          : 'AI analysis was unavailable, so this used the offline pattern engine.'}
-                        {' '}It is more literal and can miss subtler cases — treat a low score with your own judgment.
+                          : (analysis.degraded ?? 'AI analysis was unavailable, so this used the offline pattern engine.')}
+                        {' '}The offline engine is more literal and can miss subtler cases — treat a low score with your own judgment.
                       </span>
                     </p>
                   ) : null}
