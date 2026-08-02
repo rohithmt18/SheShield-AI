@@ -98,7 +98,15 @@ function upload(path, form, { onProgress, signal } = {}) {
       try { data = JSON.parse(xhr.responseText); } catch { /* non-JSON error body */ }
 
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new ApiError(data?.error ?? `Request failed (${xhr.status}).`, xhr.status));
+        // A 404 here is almost always version skew, not a wrong URL: the
+        // frontend deployed with a feature the API has not shipped yet. The
+        // server's generic "Unknown endpoint." tells the user nothing they can
+        // act on, so name the actual situation.
+        const message = xhr.status === 404
+          ? 'Screenshot analysis is not available on the server yet. The API may still be '
+            + 'deploying — try again shortly, or paste the messages as text in the meantime.'
+          : data?.error ?? `Request failed (${xhr.status}).`;
+        reject(new ApiError(message, xhr.status));
         return;
       }
       if (data?.sessionId) setSessionId(data.sessionId);
