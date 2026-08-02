@@ -53,7 +53,7 @@ export function fillUnscoredMessages(raw, messages) {
  * A degraded result is still a result — the user is told which engine ran, but
  * never blocked. `normaliseAnalysis` sanitises whichever raw output arrives.
  */
-export async function analyseMessages(messages, { sourceLabel, region } = {}) {
+export async function analyseMessages(messages, { sourceLabel, region, source = null } = {}) {
   let raw;
   let engine = 'heuristic';
   let degraded = null;
@@ -84,6 +84,12 @@ export async function analyseMessages(messages, { sourceLabel, region } = {}) {
   const analysis = normaliseAnalysis(raw, { messages, sourceLabel, engine });
   analysis.resources = resourcesFor(analysis.categories, analysis.level, region);
   if (degraded) analysis.degraded = degraded;
+  // How the text was obtained, when it wasn't typed. Attached after
+  // normalisation like `resources` and `degraded`, because it is server-derived
+  // provenance rather than model output needing to be distrusted. Deliberately
+  // excludes the filename: device filenames identify people, and this app holds
+  // nothing that does.
+  if (source) analysis.source = source;
 
   return analysis;
 }

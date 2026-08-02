@@ -59,6 +59,7 @@ flowchart LR
 | | |
 |---|---|
 | 🔍 **Threat detection** | Per-message severity scoring (0–100) across **11 harm categories** — harassment, sexual harassment, threats, stalking, grooming, doxxing, sextortion, non-consensual imagery, impersonation, hate speech, financial exploitation. Detects escalation over time and names the behavioural pattern. |
+| 🖼️ **Screenshots, not just text** | Upload a JPG, PNG or WebP of a chat. The text is read out with OCR and scored by the same pipeline, so the result is identical to a paste — and you are shown exactly what was recognised, to correct before it becomes evidence. |
 | 💬 **Anonymous companion** | A trauma-informed chat companion. No account, no name, no email. Crisis language (self-harm, immediate danger) is intercepted **before** the model ever sees it and answered with helplines directly. |
 | 📄 **Incident reports** | Flagged excerpts, timeline, and classifications compiled into a structured **PDF** for cybercrime.gov.in, a Cyber Crime Cell, or a platform's trust & safety team. |
 | 🧭 **Guided reporting** | Helplines, portals, and NGOs routed by incident type **and** state — the Bengaluru CEN station, not a generic list. Plus an evidence-preservation checklist. |
@@ -156,6 +157,48 @@ sequenceDiagram
     N-->>F: Analysis + routed resources
     F-->>U: Severity dial, flagged messages,<br/>next steps, helplines
 ```
+
+### Screenshots
+
+Most people have a screenshot, not a text export. So an image is reduced to the thing the pipeline
+already understands, and everything after that is identical — same scoring, same stored document,
+same report.
+
+```mermaid
+flowchart LR
+    IMG["🖼️ JPG · PNG · WebP<br/>≤ 8 MB"] --> V{"Signature<br/>check"}
+    V -->|"not an image"| R415["415 · rejected"]
+    V -->|"valid"| E{"VISION_MODEL<br/>configured?"}
+    E -->|yes| VM["Vision model<br/>transcribes"]
+    E -->|no| OCR["Tesseract OCR"]
+    VM -.->|"unreachable"| OCR
+    VM & OCR --> SP["Screenshot parser<br/>bubbles · timestamps"]
+    SP --> P["The ordinary<br/>analysis pipeline"]
+
+    style R415 fill:#7f1d1d,stroke:#ef4444,color:#fff
+    style P fill:#064e3b,stroke:#10b981,color:#fff
+    style OCR fill:#1a1625,stroke:#f59e0b,color:#fff
+    style VM fill:#1a1625,stroke:#f59e0b,color:#fff
+```
+
+Four things worth knowing:
+
+- **The file's bytes decide what it is, not its name or its `Content-Type`.** Both are supplied by
+  the client. Renaming a file to `.png` gets it past a mimetype check and no further.
+- **Screenshots get their own parser.** The paste parser expects `Sender: text` with a leading
+  timestamp; a screenshot has neither — the sender is *which side the bubble is on*, which OCR
+  discards, and the time trails the message. Run through the paste parser, six bubbles collapse to
+  three messages and `10:14 pm` is read as a sender named "10". `parseScreenshot` groups on the
+  trailing timestamp instead. **The paste parser was not touched.**
+- **You are shown what was read.** OCR misreads things, and this text may end up in a police
+  complaint — so the recognised text is displayed with its confidence score and a button to correct
+  it and re-run.
+- **Attribution is honestly incomplete.** With the bubble geometry gone there is no way to separate
+  her replies from theirs, so every line is attributed to one sender and the UI says so.
+
+Nothing is written to disk: the image is held in memory for the length of the request and never
+persists. Only the analysis is stored, plus a small `source` record — the method, engine, and
+confidence, never the filename.
 
 ### Graceful degradation
 
@@ -316,7 +359,7 @@ sheshieldai/
 │   ├── src/
 │   │   ├── index.js           # Express app, CORS, error handling, shutdown
 │   │   ├── config.js          # env → config, provider selection
-│   │   ├── middleware/        # hashed-IP rate limiting
+│   │   ├── middleware/        # hashed-IP rate limiting, image upload validation
 │   │   ├── providers/
 │   │   │   ├── index.js       # provider selection — services never import a vendor
 │   │   │   ├── prompts.js     # shared prompts, so backends can't drift
@@ -324,7 +367,9 @@ sheshieldai/
 │   │   │   ├── gemini.js      # structured output + thinking-token guards
 │   │   │   └── heuristic.js   # offline classifier, no network
 │   │   ├── routes/            # session · analyze · chat · report
-│   │   └── services/          # parse · analyze · chat · report · pdf · resources
+│   │   └── services/
+│   │       ├── extract/       # image → text: ocr (tesseract) · vision · strategy registry
+│   │       └── …              # parse · analyze · chat · report · pdf · resources
 │   └── test/smoke.mjs         # 21 tests — no key, no network
 │
 ├── frontend/                  # @sheshieldai/frontend — React app
@@ -411,6 +456,10 @@ offline engine and in-memory storage.
 | `MONGODB_DB` | `sheshieldai` | |
 | `DATA_FILE` | `./.data/sessions.json` | Set empty to force in-memory |
 | `RETENTION_DAYS` | `7` | Enforced by a Mongo TTL index |
+| `VISION_MODEL` | — | A multimodal Groq model reads screenshots instead of OCR. OCR stays as the fallback |
+| `MAX_IMAGE_BYTES` | `8388608` | 8 MB upload ceiling |
+| `OCR_LANGUAGES` | `eng` | `+`-joined Tesseract packs, e.g. `eng+hin` |
+| `OCR_CACHE_DIR` | `./.data/tessdata` | Caches the ~10 MB language pack across cold starts |
 | `PORT` | `5050` | Don't set this on Render — it injects its own |
 | `CORS_ORIGIN` | *(dev origins)* | Comma-separated. **Adds** to `localhost`/`127.0.0.1` on 5273 + 5274 in dev; **replaces** them in production. **Must be set in production** |
 
@@ -438,6 +487,7 @@ any working directory.
 | `POST` | `/api/session` | Create or resume an anonymous session |
 | `GET` `DELETE` | `/api/session/:id` | Fetch, or erase everything held |
 | `POST` | `/api/analyze` | Score a conversation (raw text or structured messages) |
+| `POST` | `/api/analyze/image` | Score a screenshot — `multipart/form-data`, JPG/PNG/WebP ≤ 8 MB |
 | `POST` | `/api/analyze/preview` | Parse without scoring |
 | `POST` | `/api/chat` | Companion reply |
 | `GET` `DELETE` | `/api/chat/:sessionId` | Transcript, or clear it |

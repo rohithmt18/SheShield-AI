@@ -73,6 +73,59 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   return data;
 }
 
+/**
+ * Multipart upload with progress.
+ *
+ * XMLHttpRequest rather than fetch: fetch still cannot report upload progress
+ * in any shipping browser, and an image analysis runs long enough — the upload,
+ * then OCR, then the model — that a UI with no feedback reads as broken.
+ *
+ * @param {string} path
+ * @param {FormData} form
+ * @param {{onProgress?: (percent: number) => void, signal?: AbortSignal}} [opts]
+ */
+function upload(path, form, { onProgress, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/api${path}`);
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    });
+
+    xhr.addEventListener('load', () => {
+      let data = null;
+      try { data = JSON.parse(xhr.responseText); } catch { /* non-JSON error body */ }
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new ApiError(data?.error ?? `Request failed (${xhr.status}).`, xhr.status));
+        return;
+      }
+      if (data?.sessionId) setSessionId(data.sessionId);
+      resolve(data);
+    });
+
+    xhr.addEventListener('error', () => reject(new ApiError(
+      API_BASE ? `Cannot reach the server at ${API_BASE}.`
+        : 'Cannot reach the server. Is the backend running on port 5050?',
+      0,
+    )));
+
+    xhr.addEventListener('abort', () => {
+      const err = new Error('Aborted');
+      err.name = 'AbortError';
+      reject(err);
+    });
+
+    if (signal) {
+      if (signal.aborted) { xhr.abort(); return; }
+      signal.addEventListener('abort', () => xhr.abort(), { once: true });
+    }
+
+    xhr.send(form);
+  });
+}
+
 export const api = {
   meta: () => request('/meta'),
 
@@ -92,6 +145,20 @@ export const api = {
     signal,
     body: { sessionId: getSessionId(), text, messages, sourceLabel, region },
   }),
+
+  /**
+   * Analyse a screenshot. Returns the same `{ sessionId, analysis }` as
+   * `analyze`, plus `extractedText` so the UI can show what was actually read.
+   */
+  analyzeImage: ({ file, sourceLabel, region }, { onProgress, signal } = {}) => {
+    const form = new FormData();
+    form.append('image', file);
+    const sessionId = getSessionId();
+    if (sessionId) form.append('sessionId', sessionId);
+    if (sourceLabel) form.append('sourceLabel', sourceLabel);
+    if (region) form.append('region', region);
+    return upload('/analyze/image', form, { onProgress, signal });
+  },
 
   preview: (text, signal) => request('/analyze/preview', {
     method: 'POST', signal, body: { text },

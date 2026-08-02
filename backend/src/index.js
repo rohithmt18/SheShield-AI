@@ -9,6 +9,7 @@ import { analyzeRoutes } from './routes/analyze.js';
 import { chatRoutes } from './routes/chat.js';
 import { reportRoutes } from './routes/report.js';
 import { aiAvailable, aiEngine, aiDescription } from './providers/index.js';
+import { extractorLabel, closeExtractors } from './services/extract/index.js';
 
 /** True for http://localhost:PORT, 127.0.0.1, or [::1] — any port. */
 function isLoopback(origin) {
@@ -49,6 +50,7 @@ export async function createServer() {
       ok: true,
       storage: db.backend,
       ai: aiAvailable() ? aiEngine() : 'offline',
+      imageText: extractorLabel(),
       // The allowlist is not a secret, and a wrong value here is otherwise
       // invisible from outside: an origin-less request succeeds while every
       // browser gets a 403, so it looks like the API is down rather than
@@ -128,7 +130,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const shutdown = async (signal) => {
     console.log(`\n[${signal}] shutting down…`);
     server.close();
-    await db.close();
+    // The OCR worker is a live subprocess; without this it keeps the event loop
+    // alive and the server appears to hang on Ctrl-C.
+    await Promise.allSettled([db.close(), closeExtractors()]);
     process.exit(0);
   };
   process.on('SIGINT', () => shutdown('SIGINT'));

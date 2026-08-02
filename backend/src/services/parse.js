@@ -77,6 +77,113 @@ function push(messages, message) {
   messages.push(message);
 }
 
+/**
+ * A timestamp sitting alone on its own line, as OCR returns them.
+ *
+ * Screenshots put the time inside the bubble, so it comes back on the line
+ * after the message rather than before it, and OCR frequently loses the colon
+ * ("1016 pm"). Both spellings are matched, but a bare run of digits is not — a
+ * message that reads "2024" is a message, not a clock.
+ */
+const STANDALONE_TIME = /^[([]?(?:\d{1,2}[:.]\d{2}(?::\d{2})?\s*(?:[ap]\.?\s?m\.?)?|\d{3,4}\s*[ap]\.?\s?m\.?)[)\]]?$/i;
+
+/** Interface furniture OCR picks up from the chrome around a conversation. */
+const UI_CHROME = /^(online|typing\.{0,3}|last seen.*|type a message|message|send|search|back|today|yesterday|delivered|read|seen)$/i;
+
+/**
+ * Turns OCR output from a chat screenshot into messages.
+ *
+ * `parseTranscript` is built for exports and pastes, where each line begins
+ * with its sender and its timestamp. A screenshot gives neither: the sender is
+ * expressed as which side of the screen a bubble sits on — information OCR
+ * discards entirely — and the timestamp trails the message instead of leading
+ * it. Run through the paste parser, the result is timestamps promoted to
+ * senders and six bubbles collapsed into three messages.
+ *
+ * So screenshots get their own reading of the same text. The paste parser is
+ * left exactly as it was, because text input still works and the cost of
+ * "improving" a parser that people's evidence already flows through is not
+ * worth paying.
+ *
+ * One honest limitation: with the bubble geometry gone, there is no way to tell
+ * her own replies from theirs, so every line is attributed to the same unknown
+ * sender. The per-message scoring handles this in practice — her "please stop
+ * messaging me" does not read as a threat — but the UI says so rather than
+ * implying the attribution is real.
+ *
+ * @param {string} raw OCR text
+ * @param {{maxMessages?: number}} [opts]
+ */
+export function parseScreenshot(raw, { maxMessages = 150 } = {}) {
+  let lines = String(raw ?? '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map(clean)
+    .filter((line) => line && !UI_CHROME.test(line));
+
+  const messages = [];
+  let sender = 'Them';
+
+  // The contact's name sits alone at the top of the screen. Only the very first
+  // line qualifies, so a one-word message further down is not mistaken for it.
+  if (lines.length && looksLikeSender(lines[0]) && !STANDALONE_TIME.test(lines[0])) {
+    [sender] = lines;
+    lines = lines.slice(1);
+  }
+
+  /**
+   * A chat bubble ends with its timestamp, so a timestamp line marks a
+   * boundary and the lines above it are one message however many times the
+   * text wrapped. Screenshots without visible times — a comment thread, a
+   * cropped grab — get one message per line instead, since there is nothing
+   * left to group on and merging would fuse separate threats into one.
+   */
+  const bubbleMode = lines.filter((line) => STANDALONE_TIME.test(line)).length >= 2;
+
+  let buffer = [];
+  const flush = (timestamp = null) => {
+    if (!buffer.length) return;
+    push(messages, { sender, text: buffer.join(' '), timestamp });
+    buffer = [];
+  };
+
+  for (const line of lines) {
+    if (STANDALONE_TIME.test(line)) {
+      const timestamp = line.replace(/^[([]|[)\]]$/g, '');
+      if (bubbleMode) {
+        flush(timestamp);
+      } else {
+        const previous = messages.at(-1);
+        if (previous && !previous.timestamp) previous.timestamp = timestamp;
+      }
+      continue;
+    }
+
+    // Occasionally the sender really is in the text — a forwarded quote, or a
+    // group chat that labels each bubble.
+    const match = WA_BRACKET.exec(line) ?? WA_DASH.exec(line) ?? TIME_PREFIX.exec(line);
+    if (match) {
+      const [, timestamp, who, body] = match;
+      flush();
+      push(messages, { sender: clean(who), text: clean(body), timestamp: clean(timestamp) });
+      continue;
+    }
+
+    const senderMatch = SENDER_ONLY.exec(line);
+    if (senderMatch && senderMatch[2] && looksLikeSender(clean(senderMatch[1]))) {
+      flush();
+      push(messages, { sender: clean(senderMatch[1]), text: clean(senderMatch[2]), timestamp: null });
+      continue;
+    }
+
+    if (bubbleMode) buffer.push(line);
+    else push(messages, { sender, text: line, timestamp: null });
+  }
+
+  flush();
+  return messages.slice(0, maxMessages);
+}
+
 /** Accepts either pre-structured messages from the client or raw pasted text. */
 export function toMessages(body, limits) {
   if (Array.isArray(body?.messages) && body.messages.length) {

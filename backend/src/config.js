@@ -73,4 +73,30 @@ export const config = {
     maxMessages: 150,
     maxChatTurns: 40,
   },
+
+  image: {
+    /** Screenshots off a modern phone are routinely 3–5 MB. */
+    maxBytes: Number(process.env.MAX_IMAGE_BYTES) || 8 * 1024 * 1024,
+    /** Tesseract language packs, '+'-joined. 'eng' covers romanised Hinglish. */
+    ocrLanguages: trim(process.env.OCR_LANGUAGES) || 'eng',
+    /**
+     * Where tesseract caches its trained data. On Render the working directory
+     * is ephemeral but writable, and a cached pack turns a 10 MB download per
+     * cold start into a one-off.
+     */
+    ocrCacheDir: trim(process.env.OCR_CACHE_DIR) || './.data/tessdata',
+  },
+
+  /**
+   * A vision-capable model, when one is configured.
+   *
+   * The default analysis model (llama-3.3-70b) is text-only, so images are read
+   * by OCR and the extracted text goes through the ordinary pipeline. Setting
+   * VISION_MODEL to a multimodal model switches extraction to the model itself
+   * without touching the pipeline — see services/extract/index.js.
+   */
+  get vision() {
+    const model = trim(process.env.VISION_MODEL);
+    return { model, enabled: Boolean(model) && Boolean(this.groq.apiKey) };
+  },
 };
