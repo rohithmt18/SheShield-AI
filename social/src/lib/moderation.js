@@ -44,7 +44,20 @@ function persist() {
   } catch { /* quota or private mode — cache stays in memory only */ }
 }
 
+/**
+ * Cached snapshot of the verdict list.
+ *
+ * `allVerdicts` is a getSnapshot for useSyncExternalStore, which compares
+ * snapshots with Object.is. Building a fresh array per call makes every render
+ * look like a store change and React loops until it throws. So the derived
+ * array is built once per mutation and handed back by reference until `emit`
+ * invalidates it.
+ */
+let snapshot = [];
+let snapshotStale = true;
+
 function emit() {
+  snapshotStale = true;
   for (const fn of listeners) fn();
 }
 
@@ -58,7 +71,11 @@ export const getStatus = (contentId) => (cache.has(contentId) ? 'done' : inFligh
 
 /** Everything screened so far, newest first — the Safety Dashboard's source. */
 export function allVerdicts() {
-  return [...cache.values()].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  if (snapshotStale) {
+    snapshot = [...cache.values()].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+    snapshotStale = false;
+  }
+  return snapshot;
 }
 
 export function pendingCount() {
@@ -174,6 +191,7 @@ export function rescreen(item) {
   cache.delete(item.id);
   inFlight.delete(item.id);
   persist();
+  emit(); // the delete is a change in its own right, even if screen() declines the item
   screen(item);
 }
 

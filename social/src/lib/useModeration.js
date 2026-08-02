@@ -23,8 +23,11 @@ export function useVerdict(contentId) {
   return { verdict, status };
 }
 
+/** Stable empty array — a fresh literal here would reintroduce the loop. */
+const EMPTY = Object.freeze([]);
+
 export function useAllVerdicts() {
-  return useSyncExternalStore(subscribe, allVerdicts, () => []);
+  return useSyncExternalStore(subscribe, allVerdicts, () => EMPTY);
 }
 
 export function usePendingCount() {
