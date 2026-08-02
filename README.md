@@ -173,6 +173,28 @@ MAX_TOKENS`. Two guards are in place ([`gemini.js`](backend/src/providers/gemini
 - A `MAX_TOKENS` finish that yields under 80 characters is treated as a **failure**, not a reply, so
   the offline responder takes over. Half a sentence of advice to someone in crisis is worse than none.
 
+## Deployment
+
+**Backend — Render.** Root Directory must be **blank** (the repo root), because `backend` depends on
+`@sheshieldai/database` as a workspace and npm has to install from the top. Build `npm install`,
+start `npm start`. Set `NODE_ENV=production`, `GROQ_API_KEY`, `GROQ_MODEL`, `MONGODB_URI`, and
+`MONGODB_DB`. Do **not** set `PORT` — Render injects it. MongoDB Atlas needs Network Access set to
+`0.0.0.0/0`, since the free tier has no static outbound IP.
+
+**Frontend — Vercel.** Root Directory must be **`frontend`**. Vercel reads `vercel.json` from the
+Root Directory, so the config lives at [`frontend/vercel.json`](frontend/vercel.json), not the repo
+root — put it at the root with Root Directory set to `frontend` and it is silently ignored, which
+surfaces as *"No Output Directory named `dist`"*.
+
+That file does two things:
+
+- rewrites `/api/*` to the Render service, so the browser stays same-origin and **CORS never applies**
+- falls back to `index.html`, so `/dashboard` and `/analyze` survive a refresh
+
+The Render URL in it is hardcoded; update it if the service is renamed. Alternatively drop the first
+rewrite and set `VITE_API_URL` to the backend's URL, in which case `CORS_ORIGIN` on Render must list
+the Vercel domain.
+
 ## Known issues
 
 - `npm audit` reports a high-severity advisory in `react-router` ([GHSA-qwww-vcr4-c8h2](https://github.com/advisories/GHSA-qwww-vcr4-c8h2)).
