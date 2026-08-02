@@ -80,6 +80,19 @@ export async function createServer() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { app, db } = await createServer();
 
+  // In production the default allowlist is a localhost URL, which no deployed
+  // browser will ever send. Requests still succeed from curl and server to
+  // server, because those send no Origin at all — so this fails only for real
+  // users, and looks like an unreachable API rather than a config mistake.
+  if (config.isProduction && !process.env.CORS_ORIGIN) {
+    console.warn(
+      '\n[cors] WARNING: CORS_ORIGIN is not set, so only '
+      + `${config.corsOrigins.join(', ')} is allowed.\n`
+      + '[cors] Browsers on your deployed frontend will get 403 "Origin not allowed."\n'
+      + '[cors] Set CORS_ORIGIN to the frontend URL, e.g. https://your-app.vercel.app\n',
+    );
+  }
+
   const server = app.listen(config.port, () => {
     console.log(`\n  SheShield AI API`);
     console.log(`  ├─ http://localhost:${config.port}`);

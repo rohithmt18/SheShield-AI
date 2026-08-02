@@ -186,6 +186,13 @@ Root Directory, so the config lives at [`frontend/vercel.json`](frontend/vercel.
 root — put it at the root with Root Directory set to `frontend` and it is silently ignored, which
 surfaces as *"No Output Directory named `dist`"*.
 
+**`CORS_ORIGIN` must be set to the frontend's URL**, even though the rewrite makes requests
+same-origin from the browser's point of view. Vercel forwards the browser's `Origin` header to the
+backend, and a deployed browser's origin is never the localhost default. The trap is that `curl`
+sends no `Origin` at all, so the API answers 200 from a terminal while every real browser gets
+`403 Origin not allowed` — verify with `curl -H "Origin: https://your-app.vercel.app" …`, not a
+bare `curl`. The server logs a warning at startup if it is running in production without it.
+
 That file does two things:
 
 - rewrites `/api/*` to the Render service, so the browser stays same-origin and **CORS never applies**
