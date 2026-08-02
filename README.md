@@ -14,6 +14,7 @@
 ![Express](https://img.shields.io/badge/Express_5-000000?style=flat-square&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB_Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Groq](https://img.shields.io/badge/Groq-F55036?style=flat-square&logo=groq&logoColor=white)
+![Tesseract](https://img.shields.io/badge/OCR-Tesseract-5A5A5A?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-21_passing-brightgreen?style=flat-square)
 
 *Most platforms give you a report button and nothing else.*
@@ -98,6 +99,8 @@ flowchart TB
     subgraph API["⚙️ Backend · Render"]
         EX["Express 5"]
         RL["Rate limit<br/>(hashed IPs)"]
+        UP["Upload check<br/>size · signature bytes"]
+        EXT["Extract<br/>OCR or vision model"]
         SVC["Services<br/>parse · analyze · chat · report · pdf"]
         PROV["Provider layer"]
     end
@@ -117,6 +120,7 @@ flowchart TB
     UI --> RW
     SOC --> RW
     RW --> EX --> RL --> SVC --> PROV
+    RL -->|"screenshot"| UP --> EXT --> SVC
     PROV --> GQ & GM
     PROV -.->|"fails / no key"| HEU
     SVC --> MDB
@@ -338,6 +342,8 @@ empty green wall.
 | **Motion** | Aceternity-style hero · Magic UI-style dashboard | Aurora, spotlight, bento, number tickers |
 | **Backend** | Node 20+ · Express 5 (ESM) | Long-running process, no cold starts per request |
 | **AI** | Groq (`llama-3.3-70b`) or Gemini — swappable | One entry in a provider map |
+| **Image → text** | Tesseract (WASM) · optional vision model | Pure WASM: no native build, same on a laptop and a free instance |
+| **Uploads** | Multer, memory storage | A screenshot of someone's harassment never touches disk |
 | **PDF** | PDFKit | Server-side, WinAnsi-sanitised |
 | **Database** | MongoDB Atlas + JSON-file + in-memory | One interface, three adapters |
 | **Social client** | Its own Vite app, same stack | A pure API consumer — proves the boundary holds |
@@ -551,9 +557,22 @@ curl -X POST http://localhost:5050/api/analyze \
 > image, so it looks like deploys are being ignored.
 
 Environment: `NODE_ENV=production`, `GROQ_API_KEY`, `GROQ_MODEL`, `MONGODB_URI`, `MONGODB_DB`,
-`CORS_ORIGIN`. **Do not set `PORT`** — Render injects it.
+`CORS_ORIGIN`, and optionally `VISION_MODEL`. **Do not set `PORT`** — Render injects it.
 
 MongoDB Atlas needs **Network Access → `0.0.0.0/0`**, since the free tier has no static outbound IP.
+
+> ⚠️ **Two services, one push.** Vercel and Render deploy independently, so a change that adds an
+> API route lands on the frontend first and the new call 404s until Render catches up. If a feature
+> works locally but not in production, check **Auto-Deploy** and the **Events** tab before touching
+> the code — a failed build leaves the previous version serving, which looks identical to a bug.
+>
+> `GET /health` is the quickest way to tell which build is live:
+>
+> ```bash
+> curl -s https://your-api.onrender.com/health
+> # {"ok":true,"storage":"mongodb (…)","ai":"groq","imageText":"OCR (Tesseract)", …}
+> #                                                 ^ absent on a build without image analysis
+> ```
 
 ### Frontend — Vercel
 
@@ -646,6 +665,15 @@ and should be re-verified before any real deployment.
   degrades to the offline engine with a visible notice rather than erroring.
 - **Render free tier sleeps** after ~15 minutes idle; the first request then takes ~50s. The
   frontend retries across that window rather than declaring the API dead.
+- **OCR is heavy for a 512 MB instance.** Tesseract downloads a ~10 MB language pack on first use
+  and holds it in memory, and Render's disk is ephemeral, so the download repeats after every cold
+  start — the first screenshot is slow, the rest are not. If the instance runs out of memory, set
+  `VISION_MODEL` and the model reads the image instead: no worker, no download, no memory spike, and
+  OCR stays as the fallback. That is an env var, not a code change.
+- **Deploying the frontend without the backend produces a 404**, which the API answers with its
+  generic *"Unknown endpoint."* Anything that adds a route — image analysis did — needs **both**
+  services redeployed. The upload path names this case rather than passing the server's message
+  through, and `GET /health` lists `imageText` only on a build that has the feature.
 - `npm audit` reports a high-severity advisory in `react-router`
   ([GHSA-qwww-vcr4-c8h2](https://github.com/advisories/GHSA-qwww-vcr4-c8h2)). It affects **RSC mode**
   CSRF handling; this is a plain client-side `BrowserRouter` SPA with no server actions, so it is not
