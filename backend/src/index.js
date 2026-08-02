@@ -45,7 +45,16 @@ export async function createServer() {
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, storage: db.backend, ai: aiAvailable() ? aiEngine() : 'offline' });
+    res.json({
+      ok: true,
+      storage: db.backend,
+      ai: aiAvailable() ? aiEngine() : 'offline',
+      // The allowlist is not a secret, and a wrong value here is otherwise
+      // invisible from outside: an origin-less request succeeds while every
+      // browser gets a 403, so it looks like the API is down rather than
+      // misconfigured. Reporting it makes that diagnosable in one request.
+      corsOrigins: config.corsOrigins,
+    });
   });
 
   // AI-backed routes are the expensive ones; reference data is cheap.
