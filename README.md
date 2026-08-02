@@ -660,8 +660,19 @@ It can be wrong in both directions. The UI and every generated PDF say so.
 **Legal references are informational.** Provisions (BNS, IT Act, POCSO) are cited to help someone
 describe what happened, not to advise. Every report ends by saying it is not legal advice.
 
-**Region coverage** is 10 states plus national resources. Helpline numbers were correct when written
-and should be re-verified before any real deployment.
+**Region coverage** is 10 states plus national resources. Each state carries its official cyber-unit
+site and, where one could be verified, an organisation working in that state — Vimochana in
+Karnataka, Swayam in West Bengal, Jagori in Delhi. Four states have no local entry yet, which is
+recorded as an empty list rather than padded with something unverified.
+
+Every domain in the directory was resolved before being written down, and **three that shipped
+earlier did not exist at all** (`mahacyber.in`, `tgcsb.telangana.gov.in`, `cid.gujarat.gov.in`).
+State units list **1930** rather than a direct station line: it is the national cyber helpline, it
+routes the caller to their own state's unit, and it does not go stale the way a desk number does. A
+number that rings nobody at 2am is worse than one that always works.
+
+Numbers should still be re-verified before any real deployment. This directory is only as current as
+the day it was checked.
 
 ---
 

@@ -115,11 +115,11 @@ export default function Companion() {
                 {crisis.map((c) => (
                   <a
                     key={c.id}
-                    href={`tel:${c.contact}`}
+                    href={`tel:${String(c.phone ?? c.contact).replace(/[^\d+]/g, '')}`}
                     className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground"
                   >
                     <Phone className="size-3.5" />
-                    {c.name} · {c.contact}
+                    {c.name} · {c.phone ?? c.contact}
                   </a>
                 ))}
               </div>

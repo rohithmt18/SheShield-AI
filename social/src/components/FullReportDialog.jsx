@@ -183,10 +183,10 @@ export function FullReportDialog({ verdict, trigger }) {
                     {report.resources.emergency.map((r) => (
                       <a
                         key={r.id}
-                        href={`tel:${r.contact}`}
+                        href={`tel:${String(r.phone ?? r.contact).replace(/[^\d+]/g, '')}`}
                         className="rounded-lg border border-border px-3 py-2 text-sm hover:border-primary/50"
                       >
-                        <span className="font-bold">{r.contact}</span>
+                        <span className="font-bold">{r.phone ?? r.contact}</span>
                         <span className="ml-2 text-xs text-muted-foreground">{r.name}</span>
                       </a>
                     ))}
