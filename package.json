@@ -6,14 +6,18 @@
   "workspaces": [
     "database",
     "backend",
-    "frontend"
+    "frontend",
+    "social"
   ],
   "scripts": {
     "dev": "concurrently -n backend,frontend -c magenta,cyan \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:all": "concurrently -n backend,frontend,social -c magenta,cyan,yellow \"npm:dev:backend\" \"npm:dev:frontend\" \"npm:dev:social\"",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
+    "dev:social": "npm run dev --workspace=social",
     "start": "npm start --workspace=backend",
     "build": "npm run build --workspace=frontend",
+    "build:social": "npm run build --workspace=social",
     "test": "npm test --workspace=backend"
   },
   "devDependencies": {
