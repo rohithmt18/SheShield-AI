@@ -15,6 +15,20 @@ const KIND_LABEL = {
   caption: 'Caption', comment: 'Comment', message: 'Message', thread: 'Conversation', reply: 'Reply',
 };
 
+/**
+ * Where the SheShield app itself lives.
+ *
+ * The two apps deploy as separate projects on separate domains, so this cannot
+ * be a relative path. It defaults to the dev server, which is what `npm run
+ * dev:all` serves; set VITE_SHESHIELD_URL on the deployed social client.
+ *
+ * With nothing set in a production build the link is dropped rather than
+ * pointing at localhost — a missing link is better than one that goes nowhere,
+ * particularly when it is the route to the actual support tools.
+ */
+const SHESHIELD_URL = import.meta.env.VITE_SHESHIELD_URL
+  || (import.meta.env.PROD ? '' : 'http://localhost:5273');
+
 export default function Safety() {
   const verdicts = useAllVerdicts();
   const [session, setSession] = useState(null);
@@ -170,15 +184,17 @@ export default function Safety() {
         <span className="flex-1">
           Need the companion, evidence checklist, or helpline directory? Those live in the SheShield app itself.
         </span>
-        <a
-          href="http://localhost:5273"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
-        >
-          Open SheShield
-          <ExternalLink className="size-3.5" />
-        </a>
+        {SHESHIELD_URL ? (
+          <a
+            href={SHESHIELD_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
+          >
+            Open SheShield
+            <ExternalLink className="size-3.5" />
+          </a>
+        ) : null}
       </div>
     </div>
   );

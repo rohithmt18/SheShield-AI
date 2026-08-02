@@ -598,11 +598,23 @@ first rewrite and set `VITE_API_URL` to the backend's URL.
 
 Deployed exactly like the frontend, as a **second Vercel project** on the same repo with Root
 Directory `social` and its own [`social/vercel.json`](social/vercel.json). It needs no backend
-change — but its domain must be **added to `CORS_ORIGIN`** alongside the main app's, comma-separated:
+change — but its domain must be **added to `CORS_ORIGIN`** alongside the main app's, comma-separated.
+Vercel forwards the browser's `Origin` through the `/api` rewrite, so the backend sees the social
+app's domain and rejects it unless it is listed:
 
 ```
 CORS_ORIGIN=https://she-shield-ai-frontend.vercel.app,https://your-social-app.vercel.app
 ```
+
+Set `VITE_SHESHIELD_URL` on the social project to the main app's URL. It powers the one link out of
+the demo and into the real support tools; the two apps sit on different domains, so it cannot be
+relative. A production build with it unset drops the link rather than shipping a dead `localhost`
+one.
+
+> ⚠️ **Give it its own domain, not a path under the main app.** The seed feed contains deliberate
+> harm — a suicide-baiting comment, a stalking comment, a sextortion thread — because a safety layer
+> demonstrated on an empty green wall demonstrates nothing. That content should not be reachable by
+> wandering around the site someone opened because she is being harassed.
 
 ### ⚠️ The CORS trap
 
