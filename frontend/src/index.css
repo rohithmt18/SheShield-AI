@@ -117,11 +117,6 @@
   50% { transform: translateY(-12px); }
 }
 
-/* Owned locally: Tailwind only emits its own `spin` when animate-spin is used. */
-@keyframes shine-spin {
-  to { transform: rotate(360deg); }
-}
-
 @keyframes pulse-ring {
   0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--destructive) 55%, transparent); }
   70% { box-shadow: 0 0 0 14px transparent; }

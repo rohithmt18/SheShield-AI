@@ -4,6 +4,7 @@ import {
   X, FileText, Download, Loader2, Scale, ListChecks, Quote, Phone, AlertCircle,
 } from 'lucide-react';
 import { shield } from '@/lib/shieldClient';
+import { platformById } from '@/platforms';
 import { RISK } from '@/lib/riskModel';
 import { cn, formatDateTime } from '@/lib/utils';
 
@@ -31,7 +32,10 @@ export function FullReportDialog({ verdict, trigger }) {
       const { report: built } = await shield.buildReport({
         analysisId: verdict.analysisId,
         details: {
-          platform: verdict.platform === 'instagram' ? 'Instagram' : verdict.platform,
+          // The registry holds each network's display name, so a report says
+          // "Instagram" rather than "instagram" without this file learning the
+          // name of every platform that might be connected later.
+          platform: platformById(verdict.platform).label,
           offenderHandle: verdict.author ? `@${verdict.author}` : '',
         },
       });

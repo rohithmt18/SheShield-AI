@@ -41,6 +41,16 @@ import { instagram } from './instagram';
 
 export const platforms = [instagram];
 
+/**
+ * The platform the feed, composer, and inbox read from.
+ *
+ * The pages go through this rather than importing an adapter directly, which
+ * is what keeps the registry load-bearing instead of decorative: connecting a
+ * second network is a module plus a line in `platforms`, with no page touched.
+ * When there is more than one, this becomes a selection rather than a constant.
+ */
+export const activePlatform = platforms[0];
+
 export const platformById = (id) => platforms.find((p) => p.id === id) ?? instagram;
 
 /** Placeholders shown in the UI so the extension path is visible, not implied. */

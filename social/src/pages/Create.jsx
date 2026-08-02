@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ImagePlus, ShieldCheck } from 'lucide-react';
-import { instagram } from '@/platforms/instagram';
+import { activePlatform as platform } from '@/platforms';
 import { cn } from '@/lib/utils';
 
 const GRADIENTS = [
@@ -24,7 +24,7 @@ export default function Create() {
     // Screening happens when the caption renders in the feed, through the same
     // ScreenedText path every other piece of content uses — there is no
     // separate "on create" code path that could drift from it.
-    instagram.createPost({ caption: caption.trim(), image });
+    platform.createPost({ caption: caption.trim(), image });
     navigate('/');
   }
 

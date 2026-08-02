@@ -1,12 +1,12 @@
 import { useSyncExternalStore, useCallback } from 'react';
-import { instagram } from '@/platforms/instagram';
+import { activePlatform as platform } from '@/platforms';
 import { PostCard } from '@/components/PostCard';
 import { ShieldNotice } from '@/components/ShieldNotice';
 
 export default function Feed() {
   const posts = useSyncExternalStore(
-    useCallback((fn) => instagram.subscribe(fn), []),
-    () => instagram.listPosts(),
+    useCallback((fn) => platform.subscribe(fn), []),
+    () => platform.listPosts(),
   );
 
   return (
@@ -16,9 +16,9 @@ export default function Feed() {
         <PostCard
           key={post.id}
           post={post}
-          platform={instagram}
-          onLike={(postId) => instagram.toggleLike(postId)}
-          onComment={(postId, text) => instagram.addComment(postId, { text })}
+          platform={platform}
+          onLike={(postId) => platform.toggleLike(postId)}
+          onComment={(postId, text) => platform.addComment(postId, { text })}
         />
       ))}
     </div>

@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore, useCallback, useEffect, useRef } from 'react';
 import { Send, ShieldAlert, FileText } from 'lucide-react';
-import { instagram } from '@/platforms/instagram';
+import { activePlatform as platform } from '@/platforms';
 import { Avatar } from '@/components/Avatar';
 import { ScreenedText } from '@/components/ScreenedText';
 import { FullReportDialog } from '@/components/FullReportDialog';
@@ -10,8 +10,8 @@ import { cn, relativeTime } from '@/lib/utils';
 
 export default function Messages() {
   const threads = useSyncExternalStore(
-    useCallback((fn) => instagram.subscribe(fn), []),
-    () => instagram.listThreads(),
+    useCallback((fn) => platform.subscribe(fn), []),
+    () => platform.listThreads(),
   );
   const [activeId, setActiveId] = useState(threads[0]?.id ?? null);
   const active = threads.find((t) => t.id === activeId) ?? threads[0];
@@ -86,7 +86,7 @@ function Conversation({ thread }) {
     event.preventDefault();
     const text = draft.trim();
     if (!text) return;
-    instagram.sendMessage(thread.id, { text });
+    platform.sendMessage(thread.id, { text });
     setDraft('');
   }
 
@@ -142,7 +142,7 @@ function Conversation({ thread }) {
                     text: message.text,
                     author: message.author,
                     kind: 'message',
-                    platform: 'instagram',
+                    platform: platform.id,
                   }}
                   compact
                 />
