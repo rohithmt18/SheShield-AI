@@ -27,19 +27,37 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
     (async () => {
-      try {
-        const [metaData] = await Promise.all([api.meta(), api.startSession()]);
+      // A free-tier host sleeps when idle and can take the better part of a
+      // minute to wake. One failed attempt used to leave the app permanently
+      // convinced the AI was unavailable, so keep trying across that window.
+      const backoff = [0, 2000, 4000, 8000, 15000, 25000];
+
+      for (let attempt = 0; attempt < backoff.length; attempt += 1) {
         if (cancelled) return;
-        setMeta(metaData);
-        await refresh();
-        setStatus('ready');
-      } catch (err) {
+        if (backoff[attempt]) await sleep(backoff[attempt]);
         if (cancelled) return;
-        setError(err.message);
-        setStatus('error');
+
+        try {
+          const [metaData] = await Promise.all([api.meta(), api.startSession()]);
+          if (cancelled) return;
+          setMeta(metaData);
+          await refresh();
+          setError(null);
+          setStatus('ready');
+          return;
+        } catch (err) {
+          if (cancelled) return;
+          setError(err.message);
+          // Keep status at 'loading' while retries remain, so the UI says
+          // "connecting" rather than claiming the AI is switched off.
+          if (attempt === backoff.length - 1) setStatus('error');
+        }
       }
     })();
+
     return () => { cancelled = true; };
   }, [refresh]);
 

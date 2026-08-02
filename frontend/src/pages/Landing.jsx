@@ -54,7 +54,18 @@ const STEPS = [
 ];
 
 export default function Landing() {
-  const { aiEnabled, aiEngine } = useApp();
+  const { aiEnabled, aiEngine, status } = useApp();
+
+  // Three states, not two. Until /api/meta answers we genuinely do not know
+  // which engine is live, and saying "offline" on a slow first load told
+  // people the AI was off when it was simply still waking up.
+  const engineBadge = status === 'loading'
+    ? 'Connecting to the service…'
+    : status === 'error'
+      ? 'Service unreachable — offline engine only'
+      : aiEnabled
+        ? `${engineLabel(aiEngine)}-powered analysis`
+        : 'Running on the offline engine';
 
   return (
     <>
@@ -67,7 +78,7 @@ export default function Landing() {
           >
             <Badge variant="outline" className="mb-6 border-primary/30 bg-primary/8 px-3 py-1.5 text-primary">
               <Sparkles className="size-3.5" />
-              {aiEnabled ? `${engineLabel(aiEngine)}-powered analysis` : 'Running on the offline engine'}
+              {engineBadge}
             </Badge>
           </motion.div>
 
